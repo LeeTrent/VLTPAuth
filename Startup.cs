@@ -34,6 +34,29 @@ namespace VLTPAuth
                 options.MinimumSameSitePolicy = SameSiteMode.None;
             });
 
+            Console.WriteLine("----------------------------------------------------------------");
+            Console.WriteLine("Database Connection String:");
+            Console.WriteLine(Configuration.GetSection("ConnectionStrings")["DefaultConnection"]);
+            Console.WriteLine("----------------------------------------------------------------");
+            Console.WriteLine("Logging:");
+            Console.WriteLine(Configuration.GetSection("Logging"));
+            Console.WriteLine("----------------------------------------------------------------");            
+            Console.WriteLine("Logging:LogLevel:");
+            Console.WriteLine(Configuration.GetSection("Logging:LogLevel"));
+            Console.WriteLine("----------------------------------------------------------------");            
+            Console.WriteLine("Logging:LogLevel:Default:");
+            Console.WriteLine(Configuration.GetSection("Logging:LogLevel:Default"));
+            Console.WriteLine("----------------------------------------------------------------");  
+            Console.WriteLine("(\"Logging:LogLevel\")[\"Default\"]:");
+            Console.WriteLine(Configuration.GetSection("Logging:LogLevel")["Default"]);
+            Console.WriteLine("----------------------------------------------------------------");                       
+            Console.WriteLine("AllowedHosts:");
+            Console.WriteLine(Configuration.GetSection("AllowedHosts"));
+            Console.WriteLine("----------------------------------------------------------------");     
+            Console.WriteLine("AllowedHosts<string>:");
+            Console.WriteLine(Configuration.GetValue<string>("AllowedHosts"));
+            Console.WriteLine("----------------------------------------------------------------");                     
+
             services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseSqlite(
                     Configuration.GetConnectionString("DefaultConnection")));
