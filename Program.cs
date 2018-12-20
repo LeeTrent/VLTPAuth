@@ -35,13 +35,25 @@ namespace VLTPAuth
         //           config.AddIniFile("config.ini", optional: true, reloadOnChange: true);
         //       })
         //       .UseStartup<Startup>();
+    // public static IWebHostBuilder CreateWebHostBuilder(string[] args) =>
+    //     WebHost.CreateDefaultBuilder(args)
+    //         .ConfigureAppConfiguration((hostingContext, config) =>
+    //         {
+    //             config.SetBasePath("/Users/leetrent/temp");
+    //             config.AddJsonFile("VLTPAuth.json", optional: false, reloadOnChange: true);
+    //         })
+    //         .UseStartup<Startup>();
+    // }
+
+    // export APPSETTINGS_DIRECTORY="/Users/leetrent/temp"
     public static IWebHostBuilder CreateWebHostBuilder(string[] args) =>
         WebHost.CreateDefaultBuilder(args)
             .ConfigureAppConfiguration((hostingContext, config) =>
             {
-                config.SetBasePath("/Users/leetrent/temp");
-                config.AddJsonFile("VLTPAuth.json", optional: false, reloadOnChange: true);
+                config.SetBasePath(Environment.GetEnvironmentVariable("APPSETTINGS_DIRECTORY"));
+                config.AddJsonFile("VLTPAuth_appsettings.json", optional: false, reloadOnChange: true);
             })
             .UseStartup<Startup>();
     }
+    
 }
