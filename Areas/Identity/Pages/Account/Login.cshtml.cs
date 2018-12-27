@@ -74,19 +74,36 @@ namespace VLTPAuth.Areas.Identity.Pages.Account
 
         public async Task<IActionResult> OnPostAsync(string returnUrl = null)
         {
-            returnUrl = returnUrl ?? Url.Content("~/");
+            _logger.LogInformation("[Login][OnPost] => BEGIN ...");
 
+            returnUrl = returnUrl ?? Url.Content("~/");
+            ViewData["EEXAuthFailure"] = null;
+
+            _logger.LogInformation("[Login][OnPost] => ModelState.IsValid: " + ModelState.IsValid);
+            
             if (ModelState.IsValid)
             {
+              _logger.LogInformation("[Login][OnPost] => _eexAuthService.IsAuthorized: "
+                  + _eexAuthService.IsAuthorized(Input.SSN, Input.Password));
+
               // Authenticate against EEX using SSN and PIN
               if ( _eexAuthService.IsAuthorized(Input.SSN, Input.Password) == false)
               {
                     ModelState.AddModelError(string.Empty, "Invalid SSN or PIN");
+                    ViewData["EEXAuthFailure"] = "Authentication was not successful";
+                     _logger.LogInformation("[Login][OnPost] => Returning to login page due to unsuccessful EEX authentication.");
                     return Page();                
               }
+              _logger.LogInformation("[Login][OnPost] => EEX authentication succeeded - attempting Password Sign-in ...");
+
                 // This doesn't count login failures towards account lockout
                 // To enable password failures to trigger account lockout, set lockoutOnFailure: true
                 var result = await _signInManager.PasswordSignInAsync(Input.SSN, Input.Password, Input.RememberMe, lockoutOnFailure: true);
+
+                _logger.LogInformation("[Login][OnPost] => Login succeeded: " + result.Succeeded);
+                _logger.LogInformation("[Login][OnPost] => RequiresTwoFactor: " + result.RequiresTwoFactor);
+                _logger.LogInformation("[Login][OnPost] => IsLockedOut: " + result.IsLockedOut);
+                
                 if (result.Succeeded)
                 {
                     _logger.LogInformation("User logged in.");
@@ -104,6 +121,7 @@ namespace VLTPAuth.Areas.Identity.Pages.Account
                 else
                 {
                     ModelState.AddModelError(string.Empty, "Invalid login attempt.");
+                    _logger.LogInformation("[Login][OnPost] => Password Sign-in failed - returning to login page.");
                     return Page();
                 }
             }

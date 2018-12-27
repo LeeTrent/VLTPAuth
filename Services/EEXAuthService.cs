@@ -4,7 +4,7 @@ namespace VLTPAuth
   {
     public bool IsAuthorized(string ssn, string pin)
     {
-      return false;
+      return true;
     }
   }
 }
