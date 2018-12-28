@@ -98,6 +98,7 @@ namespace VLTPAuth.Areas.Identity.Pages.Account
                 }
                 foreach (var error in result.Errors)
                 {
+                    Console.WriteLine("[Register][onPost] error.Code.......: " + error.Code);
                     Console.WriteLine("[Register][onPost] error.Description: " + error.Description);
                     ModelState.AddModelError(string.Empty, error.Description);
                 }

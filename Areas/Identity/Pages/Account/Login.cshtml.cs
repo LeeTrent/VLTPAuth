@@ -18,17 +18,20 @@ namespace VLTPAuth.Areas.Identity.Pages.Account
         private readonly SignInManager<IdentityUser> _signInManager;
         private readonly ILogger<LoginModel> _logger;
         private readonly IEEXAuthService _eexAuthService;
+        private readonly UserManager<IdentityUser> _userManager;
 
         public LoginModel
         (
           SignInManager<IdentityUser> signInManager,
           ILogger<LoginModel> logger, 
-          IEEXAuthService eexAuthService
+          IEEXAuthService eexAuthService,
+          UserManager<IdentityUser> userManager
         )
         {
             _signInManager = signInManager;
             _logger = logger;
             _eexAuthService = eexAuthService;
+            _userManager = userManager;
         }
 
         [BindProperty]
@@ -85,8 +88,10 @@ namespace VLTPAuth.Areas.Identity.Pages.Account
             {
               _logger.LogInformation("[Login][OnPost] => _eexAuthService.IsAuthorized: "
                   + _eexAuthService.IsAuthorized(Input.SSN, Input.Password));
-
+              
+              ////////////////////////////////////////////////////////////////////////////////
               // Authenticate against EEX using SSN and PIN
+              ////////////////////////////////////////////////////////////////////////////////
               if ( _eexAuthService.IsAuthorized(Input.SSN, Input.Password) == false)
               {
                     ModelState.AddModelError(string.Empty, "Invalid SSN or PIN");
@@ -94,26 +99,63 @@ namespace VLTPAuth.Areas.Identity.Pages.Account
                      _logger.LogInformation("[Login][OnPost] => Returning to login page due to unsuccessful EEX authentication.");
                     return Page();                
               }
-              _logger.LogInformation("[Login][OnPost] => EEX authentication succeeded - attempting Password Sign-in ...");
+              _logger.LogInformation("[Login][OnPost] => EEX authentication succeeded - attempting user registration/duplicate user check");
+              
+              ////////////////////////////////////////////////////////////////////////////////
+              // 1. User is authenticated against EEX
+              // 2. Try to register user if they're not already registered
+              ////////////////////////////////////////////////////////////////////////////////
+              var identityUser = new IdentityUser { UserName = Input.SSN, Email = Input.SSN };
+              var identityResult = await _userManager.CreateAsync(identityUser, Input.Password);
+              if ( identityResult.Succeeded == false
+                      && this.isDuplicateUser(identityResult.Errors) == false)
+              {
+                  ModelState.AddModelError(string.Empty, "User registration attempt failed and use is not a duplicate user");
+                  ViewData["EEXAuthFailure"] = "User registration attempt / duplicate user check failed";
+                   _logger.LogInformation("[Login][OnPost] => Returning to login page due to unsuccessful registration attempt/duplicate user check.");
+                  return Page();                    
+              }
+              _logger.LogInformation("[Login][OnPost] => User registration/duplicate user check succeeded - attempting password sign-in");
 
+                ////////////////////////////////////////////////////////////////////////////////
+                // 1. User is authenticated against EEX
+                // 2. User is registered in our system
+                // 3. Attempt to log user into our system
+                ////////////////////////////////////////////////////////////////////////////////
                 // This doesn't count login failures towards account lockout
                 // To enable password failures to trigger account lockout, set lockoutOnFailure: true
-                var result = await _signInManager.PasswordSignInAsync(Input.SSN, Input.Password, Input.RememberMe, lockoutOnFailure: true);
+                var signInResult = await _signInManager.PasswordSignInAsync(Input.SSN, Input.Password, Input.RememberMe, lockoutOnFailure: true);
 
-                _logger.LogInformation("[Login][OnPost] => Login succeeded: " + result.Succeeded);
-                _logger.LogInformation("[Login][OnPost] => RequiresTwoFactor: " + result.RequiresTwoFactor);
-                _logger.LogInformation("[Login][OnPost] => IsLockedOut: " + result.IsLockedOut);
+                _logger.LogInformation("[Login][OnPost] => signInResult.Succeeded): " + signInResult.Succeeded);
+                //_logger.LogInformation("[Login][OnPost] => RequiresTwoFactor: " + signInResult.RequiresTwoFactor);
+                //_logger.LogInformation("[Login][OnPost] => IsLockedOut: " + signInResult.IsLockedOut);
                 
-                if (result.Succeeded)
+                if (signInResult.Succeeded)
                 {
-                    _logger.LogInformation("User logged in.");
-                    return LocalRedirect(returnUrl);
+                  _logger.LogInformation("[Login][OnPost] => RequiresTwoFactor: " + signInResult.RequiresTwoFactor);
+                  _logger.LogInformation("[Login][OnPost] => Password sign-in succeeded - checking to see if 2-factor authentication has been enabled.");
+
+                  ////////////////////////////////////////////////////////////////////////////////
+                  // 1. User is authenticated against EEX
+                  // 2. User is registered in our system
+                  // 3. Login attempt was successful
+                  // 4. Check to see if 2-factor authentication has been enabled
+                  ////////////////////////////////////////////////////////////////////////////////                  
+                  identityUser = await _signInManager.UserManager.FindByNameAsync(Input.SSN);
+                  _logger.LogInformation("[Login][OnPost] => identityUser.TwoFactorEnabled: " + identityUser.TwoFactorEnabled);
+                  if ( identityUser.TwoFactorEnabled == false)
+                  {
+                        _logger.LogInformation("[Login][OnPostAsync] - Two-factor auth NOT enabled, redirecting to './Manage/EnableAuthenticator' page");
+                        return RedirectToPage("./Manage/EnableAuthenticator");
+                  }
+                  _logger.LogInformation("User logged in.");
+                  return LocalRedirect(returnUrl);
                 }
-                if (result.RequiresTwoFactor)
+                if (signInResult.RequiresTwoFactor)
                 {
                     return RedirectToPage("./LoginWith2fa", new { ReturnUrl = returnUrl, RememberMe = Input.RememberMe });
                 }
-                if (result.IsLockedOut)
+                if (signInResult.IsLockedOut)
                 {
                     _logger.LogWarning("User account locked out.");
                     return RedirectToPage("./Lockout");
@@ -128,6 +170,18 @@ namespace VLTPAuth.Areas.Identity.Pages.Account
 
             // If we got this far, something failed, redisplay form
             return Page();
+        }
+
+        private bool isDuplicateUser(IEnumerable<IdentityError> errors) 
+        {
+            foreach (var error in errors)
+            {
+              if (error.Code.Equals("DuplicateUserName"))
+              {
+                return true;
+              }
+           }
+           return false;
         }
     }
 }
